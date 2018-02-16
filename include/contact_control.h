@@ -10,7 +10,7 @@
 #include <vector>
 #include <math.h>
 #include <geometry_msgs/WrenchStamped.h>
-#include <move_interface/move_interface.h>
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <tf/transform_listener.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <netft_utils/SetBias.h>
@@ -205,7 +205,7 @@ public:
    * Return a pointer to the move interface instance.
    * return    The pointer to the active move interface instance.
    */
-  MoveInterface* getMI();
+  moveit::planning_interface::MoveGroupInterface* getMI();
 
   /**
    * Return a pointer to the force/torque interface instance.
@@ -253,7 +253,7 @@ private:
   ros::NodeHandle n;                              /*!< The ROS node handle for this instance */
   ros::AsyncSpinner* spinner;                      /*!< The ROS async spinner for this instance */
   tf::TransformListener* listener;                 /*!< Pointer to a transform listener */
-  MoveInterface* mi;                               /*!< Pointer to the robot move interface */
+  moveit::planning_interface::MoveGroupInterface* mi;                               /*!< Pointer to the robot move interface */
   ContactDirection direction[Contact::NUM_DIMS];   /*!< Array of Contact direction objects */
   NetftUtilsLean* fti;                             /*!< Pointer to the force torque interface */
 

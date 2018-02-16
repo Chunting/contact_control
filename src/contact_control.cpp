@@ -21,7 +21,7 @@ monitorFT(false),
 isInit(false),
 netftCancel(false)
 {
-  mi = new MoveInterface();
+  mi = new moveit::planning_interface::MoveGroupInterface("group_name"); //TODO what name?
 }
 
 ContactControl::~ContactControl()
@@ -73,8 +73,6 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
   ftFrame = ftf;
   controlFrame = cf;
 
-  // Initiallize the move interface
-  mi->initialize(mg);
 
   // Initialize transform listener (give it a buffer of 300 seconds)
   listener = new tf::TransformListener(ros::Duration(300));
@@ -604,7 +602,7 @@ bool ContactControl::ftMonitor()
   return true;
 }
 
-MoveInterface* ContactControl::getMI()
+moveit::planning_interface::MoveGroupInterface* ContactControl::getMI()
 {
   return mi;
 }

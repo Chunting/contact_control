@@ -7,7 +7,8 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  move_interface
+  moveit_core
+  moveit_kinematics
   netft_utils
   roscpp
   std_msgs
@@ -85,7 +86,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES contact_control
-  CATKIN_DEPENDS move_interface netft_utils roscpp std_msgs
+  CATKIN_DEPENDS moveit_core moveit_kinematics netft_utils roscpp std_msgs
 #  DEPENDS system_lib
 )
 
@@ -96,7 +97,6 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(include)
-include_directories(move_interface/include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
