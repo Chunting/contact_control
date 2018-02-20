@@ -12,8 +12,8 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
-#include <contact_enums.h>
-#include <history.h>
+#include <contact_control/contact_enums.h>
+#include <contact_control/history.h>
 
 class ContactDirection {
 public:

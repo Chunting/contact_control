@@ -1,4 +1,4 @@
-#include "contact_direction.h"
+#include "contact_control/contact_direction.h"
 
 ContactDirection::ContactDirection() :
     isInitialized(false),

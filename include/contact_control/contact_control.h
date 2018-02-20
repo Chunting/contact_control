@@ -18,10 +18,10 @@
 #include <netft_utils/StopSim.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Bool.h>
-#include <contact_direction.h>
+#include <contact_control/contact_direction.h>
 #include <future>
 #include <netft_utils_lean.h>
-#include <contact_enums.h>
+#include <contact_control/contact_enums.h>
 
 class ContactControl {
 public:

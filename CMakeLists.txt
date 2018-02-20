@@ -9,11 +9,14 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 find_package(catkin REQUIRED COMPONENTS
   moveit_core
   moveit_kinematics
+  moveit_ros_planning_interface
   netft_utils
   roscpp
   std_msgs
   tf
 )
+
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -86,9 +89,10 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES contact_control
-  CATKIN_DEPENDS moveit_core moveit_kinematics netft_utils roscpp std_msgs
-#  DEPENDS system_lib
+  CATKIN_DEPENDS moveit_core moveit_kinematics netft_utils roscpp std_msgs tf
+  #DEPENDS Eigen3
 )
+
 
 ###########
 ## Build ##
@@ -140,11 +144,11 @@ target_link_libraries(contact_control
 # )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY include/${PROJECT_NAME}/
+   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+   FILES_MATCHING PATTERN "*.h"
+   PATTERN ".svn" EXCLUDE
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES

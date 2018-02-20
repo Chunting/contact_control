@@ -1,4 +1,4 @@
-#include "contact_control.h"
+#include "contact_control/contact_control.h"
 
 ContactControl::ContactControl() :
     fixedFrame(""),
