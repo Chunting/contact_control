@@ -19,9 +19,7 @@ ContactControl::ContactControl() :
     gravLever(0.0),
     monitorFT(false),
     isInit(false),
-    netftCancel(false) {
-  mi = new moveit::planning_interface::MoveGroupInterface("group_name"); //TODO what name?
-}
+    netftCancel(false) {}
 
 ContactControl::~ContactControl() {
   delete spinner;
@@ -31,6 +29,7 @@ ContactControl::~ContactControl() {
 }
 
 void ContactControl::initialize(std::string mg, std::string ff, std::string vf, std::string ftf, std::string cf) {
+  mi = new moveit::planning_interface::MoveGroupInterface(mg);
   // Start spinner
   spinner = new ros::AsyncSpinner(3);
   spinner->start();
@@ -51,7 +50,7 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
     return;
   }
   // Set max force and torque (used for threshold to cancel moves)
-  fti->setMax(80.0, 8.0, 60.0, 6.0);
+  fti->setMax(80.0, 80.0, 60.0, 60.0); //TODO make this configurable!
 
   // Initialize variables
   if (ff.compare("") == 0 || vf.compare("") == 0 || ftf.compare("") == 0 || cf.compare("") == 0) {
@@ -90,6 +89,7 @@ std::future <Contact::EndCondition> ContactControl::moveAsync(double fMax, doubl
 }
 
 Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax) {
+  fti->setMax(fMax, tMax, fMax, tMax);
   // Do not do anything if Contact Control did not initialize properly
   if (!isInit) {
     ROS_ERROR_STREAM("Cannot perform move. Contact control was not initialized properly.");
@@ -269,6 +269,9 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
     ////ROS_INFO_STREAM("Velocity: " << (vMax - (ft/k)));
   }
   ROS_INFO("Finished move.");
+  if (netftCancel) {
+    ROS_INFO("NetFt cancel called.");
+  }
   for (int j = 0; j < Contact::NUM_DIMS; j++) {
     direction[j].reset();
   }
