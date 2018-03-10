@@ -1,0 +1,4 @@
+contact_control:
+  lp_filter_enabled: true
+  lp_filter_delta_t: 0.2
+  lp_filter_cutoff_freq: 0.6

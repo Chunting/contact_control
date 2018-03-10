@@ -36,6 +36,18 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
 
   // Create force/torque interface
   fti = new NetftUtilsLean(&n);
+
+  bool filter_enabled;
+  n.getParam("contact_control/lp_filter_enabled", filter_enabled);
+  if (filter_enabled) {
+    double deltaT;
+    n.getParam("contact_control/lp_filter_delta_t", deltaT);
+    double cutoffFreq;
+    n.getParam("contact_control/lp_filter_cutoff_freq", cutoffFreq);
+    fti->setFilter(true, deltaT, cutoffFreq);
+  }
+
+
   if (!ftTopic.empty()) {
     fti->setFTTopic(ftTopic);
   } else if (!ftAddress.empty()) {
@@ -235,6 +247,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
         vMax = 0.99;
       }
       bool sendJog = false;
+
       for (int i = 0; i < Contact::NUM_DIMS; i++) {
         if (deltas[i] > vMax)
           deltas[i] = vMax;
@@ -248,7 +261,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       if (sendJog) {
         jogCmd.header.frame_id = velFrame;
         jogCmd.header.stamp = ros::Time::now();
-        jogCmd.twist.linear.x = deltas[0];
+        jogCmd.twist.linear.x = -deltas[0]; //TODO: directions??
         jogCmd.twist.linear.y = deltas[1];
         jogCmd.twist.linear.z = deltas[2];
         jogCmd.twist.angular.x = deltas[3];
