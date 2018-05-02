@@ -150,6 +150,11 @@ install(DIRECTORY include/${PROJECT_NAME}/
    PATTERN ".svn" EXCLUDE
 )
 
+
+add_executable(contact_control_node src/contact_control_node.cpp)
+target_link_libraries(contact_control_node ${catkin_LIBRARIES} contact_control)
+add_dependencies(contact_control_node ${catkin_EXPORTED_TARGETS})
+
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
 #   # myfile1

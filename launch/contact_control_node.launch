@@ -1,0 +1,5 @@
+<launch>
+  <rosparam command="load" file="$(find contact_control)/conf/contact_control_conf.yaml"/>
+
+  <node pkg="contact_control" name="contact_control_node" type="contact_control_node" output="screen"/>
+</launch>
