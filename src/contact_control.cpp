@@ -102,6 +102,7 @@ std::future <Contact::EndCondition> ContactControl::moveAsync(double fMax, doubl
 
 Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax) {
   fti->setMax(fMax, tMax, fMax, tMax);
+
   // Do not do anything if Contact Control did not initialize properly
   if (!isInit) {
     ROS_ERROR_STREAM("Cannot perform move. Contact control was not initialized properly.");
@@ -231,11 +232,17 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       if (gravBalance) {
         ft -= torque.at(i);
       }
-      deltas[i] = direction[i].getVelocity(ft, currentPose);
+
       Contact::EndCondition dirCondition = direction[i].getCondition(ft, currentPose);
-      if (dirCondition != Contact::NO_CONDITION)
-        endCondition = dirCondition;
+
+      if (dirCondition != Contact::NO_CONDITION) {
+        ROS_INFO_STREAM("Stopping moving for direction " << i );
+        deltas[i] = 0.0;
+      } else {
+        deltas[i] = direction[i].getVelocity(ft, currentPose);
+      }
     }
+
     if (Contact::NO_CONDITION == endCondition) {
       // Convert deltas to world frame to send to controller
       toVelFrame(deltas, time);
@@ -262,13 +269,13 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
         jogCmd.header.frame_id = velFrame;
         jogCmd.header.stamp = ros::Time::now();
         jogCmd.twist.linear.x = -deltas[0]; //TODO: directions??
-        jogCmd.twist.linear.y = deltas[1];
+        jogCmd.twist.linear.y = -deltas[1];
         jogCmd.twist.linear.z = deltas[2];
         jogCmd.twist.angular.x = deltas[3];
         jogCmd.twist.angular.y = deltas[4];
         jogCmd.twist.angular.z = deltas[5];
         delta_pub.publish(jogCmd);
-      }
+      } //TODO stop the move
     } else {
       ROS_INFO_STREAM("Met end condition. Stopping move.");
     }

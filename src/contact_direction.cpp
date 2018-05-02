@@ -113,11 +113,13 @@ double ContactDirection::getVelocity(double ft, geometry_msgs::PoseStamped pose)
   if (isReady) {
     double velocity;
     if (Contact::SPRING == movementType) {
-      if (Contact::DIM_RX == direction) {
-        velocity = (springConstant * (getTravel(pose) - positionOffset) + (1 / dampingCoeff) * ft);
-      } else {
-        velocity = (springConstant * -(getTravel(pose) + positionOffset) + (1 / dampingCoeff) * ft);
-      }
+      //dampingCoeff - mida suurem, seda aeglasemalt liigub. Esialgu katsetada 1'ga, siis saab võrdustada springContanti max ft'ga
+      //springConstant - mida suurem, seda
+      /*if (fabs(getTravel(pose)) >= displacementMax) {
+        //TODO jätta meelde, kuhu poole liikus (velocity märk) ning kui see muutub, siis lahti lasta...
+      }*/
+      //velocity = (1 / dampingCoeff * ft) - (springConstant * (getTravel(pose) /*+ positionOffset*/));
+      velocity = (springConstant * -(getTravel(pose) + positionOffset) + (1 / dampingCoeff) * ft);
     } else if (Contact::DIRECTION == movementType) {
       velocity = checkSpeed((velocityMax + (ft / (springConstant))), pose);
     } else if (Contact::FOLLOWER == movementType) {
@@ -251,7 +253,7 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
   double travel = 0.0;
   tf::Stamped <tf::Pose> endPose;
   tf::poseStampedMsgToTF(pose, endPose);
-  if (endPose.frame_id_.compare("start_frame") != 0) {
+  if (startPose.frame_id_.compare("start_frame") != 0) { //TODO compare with endpose or startposE?
     toStartFrame(endPose);
   }
   //ROS_INFO_STREAM("Start pose: Frame: " << startPose.frame_id_ << ". X: " << startPose.getOrigin().getX() << " Y: " << startPose.getOrigin().getY() << " Z: " << startPose.getOrigin().getZ() <<
@@ -263,9 +265,11 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
   switch (direction) {
     case Contact::DIM_X:
       travel = endPose.getOrigin().getX() - startPose.getOrigin().getX();
+      ROS_INFO_STREAM("Get travel for dim: x. Travel: " << travel);
       break;
     case Contact::DIM_Y:
       travel = endPose.getOrigin().getY() - startPose.getOrigin().getY();
+      ROS_INFO_STREAM("Get travel for dim: y. Travel: " << travel);
       break;
     case Contact::DIM_Z:
       travel = endPose.getOrigin().getZ() - startPose.getOrigin().getZ();
