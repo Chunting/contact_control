@@ -191,7 +191,8 @@ private:
     Contact::Movement movementType;               /*!< Tells which behavior law this dimension is acting on */
     double travelMax;                  /*!< Records the farthest we have gone in this direction */
     bool isReady;                    /*!< True if a control scheme has been picked and initialized */
-
+    double velocity = 0.0;
+    double deceleration = 0.005;
     // Listener
     tf::TransformListener *listener;              /*!< Pointer to a transform listener */
 

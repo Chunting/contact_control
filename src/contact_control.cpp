@@ -57,6 +57,10 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
     return;
   }
 
+  n.getParam("contact_control/flip_xy", flipXY);
+  n.getParam("contact_control/x_direction", xDirection);
+  n.getParam("contact_control/y_direction", yDirection);
+
   if (!fti->initialize(controlRate, ff, ftf)) {
     ROS_ERROR("Failed to initialize force torque interface");
     return;
@@ -112,13 +116,13 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
   std::future<bool> ftThread;
   bool startedFT = false;
   if (!fti->isRunning()) {
-    ROS_INFO("Starting FT");
+    ROS_INFO("[ContactControl] Starting FT");
     ftThread = std::async(std::launch::async, &NetftUtilsLean::run, fti);
     startedFT = true;
   }
   // Cancel move if netft is not available
   if (!fti->waitForData(10.0)) {
-    ROS_ERROR("Cannot perform move. Netft is not receiving data.");
+    ROS_ERROR("[ContactControl] Cannot perform move. Netft is not receiving data.");
     gravBalance = false;
     return Contact::NO_FT_DATA;
   }
@@ -129,14 +133,14 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
   // Cancel move if there is already a move happenning
   if (isMoving) {
     ROS_ERROR(
-        "Cannot perform move while another move is executing. Please use stopMove() to end the previous move first.");
+        "[ContactControl] Cannot perform move while another move is executing. Please use stopMove() to end the previous move first.");
     gravBalance = false;
     monitorFT = false;
     monitorThread.get();
     return Contact::IN_MOTION;
   } else {
     isMoving = true;
-    ROS_INFO("Starting move.");
+    ROS_INFO("[ContactControl] Starting move.");
   }
 
   // Record start position
@@ -162,7 +166,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       }
     }
     if (-1 == startInfo) {
-      ROS_ERROR("Cannot perform move. You have not initialized any control directions");
+      ROS_ERROR("[ContactControl] Cannot perform move. You have not initialized any control directions");
       isMoving = false;
       gravBalance = false;
       monitorFT = false;
@@ -215,7 +219,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
           listener->lookupTransform(controlFrame, velFrame, ros::Time(0), tempTransform);
         }
         catch (tf::TransformException ex) {
-          ROS_ERROR("Error in balance tf transform. Stopping move.");
+          ROS_ERROR("[ContactControl] Error in balance tf transform. Stopping move.");
           stopMove();
         }
         tempTransform.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
@@ -236,7 +240,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       Contact::EndCondition dirCondition = direction[i].getCondition(ft, currentPose);
 
       if (dirCondition != Contact::NO_CONDITION) {
-        ROS_INFO_STREAM("Stopping moving for direction " << i );
+        ROS_INFO_STREAM("[ContactControl] Stopping move for direction " << i << " because of " << dirCondition);
         deltas[i] = 0.0;
       } else {
         deltas[i] = direction[i].getVelocity(ft, currentPose);
@@ -248,7 +252,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       toVelFrame(deltas, time);
       // Limit deltas to be less than vMax
       if (vMax > 1.0 || vMax <= 0.0) {
-        ROS_ERROR("vMax must be between 0 and 1. Setting vMax to 0.5");
+        ROS_ERROR("[ContactControl] vMax must be between 0 and 1. Setting vMax to 0.5");
         vMax = 0.5;
       } else if (vMax == 1.0) {
         vMax = 0.99;
@@ -260,16 +264,23 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
           deltas[i] = vMax;
         else if (deltas[i] < -vMax)
           deltas[i] = -vMax;
-        if (fabs(deltas[i]) > 1e-5)
-          sendJog = true;
+
+        sendJog = true;
       }
       // Send deltas to controller
       geometry_msgs::TwistStamped jogCmd;
       if (sendJog) {
         jogCmd.header.frame_id = velFrame;
         jogCmd.header.stamp = ros::Time::now();
-        jogCmd.twist.linear.x = -deltas[0]; //TODO: directions??
-        jogCmd.twist.linear.y = -deltas[1];
+
+        if (flipXY) {
+          jogCmd.twist.linear.x = deltas[1] * xDirection;
+          jogCmd.twist.linear.y = deltas[0] * yDirection;
+        } else {
+          jogCmd.twist.linear.x = deltas[0] * xDirection;
+          jogCmd.twist.linear.y = deltas[1] * yDirection;
+        }
+
         jogCmd.twist.linear.z = deltas[2];
         jogCmd.twist.angular.x = deltas[3];
         jogCmd.twist.angular.y = deltas[4];
@@ -277,7 +288,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
         delta_pub.publish(jogCmd);
       } //TODO stop the move
     } else {
-      ROS_INFO_STREAM("Met end condition. Stopping move.");
+      ROS_INFO_STREAM("[ContactControl] Met end condition. Stopping move.");
     }
     loopRate.sleep();
     // Publish data to be plotted
@@ -288,9 +299,9 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
     //ROS_INFO_STREAM("Force or Torque: " << ft);
     ////ROS_INFO_STREAM("Velocity: " << (vMax - (ft/k)));
   }
-  ROS_INFO("Finished move.");
+  ROS_INFO("[ContactControl] Finished move.");
   if (netftCancel) {
-    ROS_INFO("NetFt cancel called.");
+    ROS_INFO("[ContactControl] NetFt cancel called.");
   }
   for (int j = 0; j < Contact::NUM_DIMS; j++) {
     direction[j].reset();
@@ -315,25 +326,25 @@ Contact::EndCondition
 ContactControl::balance(Contact::Dimension lDim, Contact::Dimension fDim, bool inWorld, double leverArm,
                         Contact::Dimension mDim, double mSpeed, double fMax, double tMax) {
   if (fabs(mSpeed) > (1 + 1e-3)) {
-    ROS_ERROR_STREAM("Speed value must be between -1 and 1. Cannot perform balance procedure.");
+    ROS_ERROR_STREAM("[ContactControl] Speed value must be between -1 and 1. Cannot perform balance procedure.");
     return Contact::INVALID_PARAMS;
   }
   if (fabs(leverArm) <= 1e-3) {
-    ROS_ERROR_STREAM("Lever arm must be non zero. Cannot perform balance procedure.");
+    ROS_ERROR_STREAM("[ContactControl] Lever arm must be non zero. Cannot perform balance procedure.");
     return Contact::INVALID_PARAMS;
   }
   if (lDim == Contact::DIM_RX || lDim == Contact::DIM_RY || lDim == Contact::DIM_RZ || fDim == Contact::DIM_RX ||
       fDim == Contact::DIM_RY || fDim == Contact::DIM_RZ) {
     ROS_ERROR_STREAM(
-        "Lever dimension and force dimension must be a linear dimension. Cannot perform balance procedure.");
+        "[ContactControl] Lever dimension and force dimension must be a linear dimension. Cannot perform balance procedure.");
     return Contact::INVALID_PARAMS;
   }
   if (mDim == Contact::DIM_RX || mDim == Contact::DIM_RY || mDim == Contact::DIM_RZ) {
-    ROS_ERROR_STREAM("Movement dimension must be a linear dimension. Cannot perform balance procedure.");
+    ROS_ERROR_STREAM("[ContactControl] Movement dimension must be a linear dimension. Cannot perform balance procedure.");
     return Contact::INVALID_PARAMS;
   }
   if (fDim == lDim) {
-    ROS_ERROR_STREAM("Lever dimension and force dimension cannot be the same. Cannot perform balance procedure.");
+    ROS_ERROR_STREAM("[ContactControl] Lever dimension and force dimension cannot be the same. Cannot perform balance procedure.");
     return Contact::INVALID_PARAMS;
   }
   leverDim = lDim;
@@ -368,7 +379,7 @@ ContactControl::balanceAsync(Contact::Dimension lDim, Contact::Dimension fDim, b
 
 void ContactControl::toVelFrame(std::vector<double> &cmd, ros::Time time) {
   if (cmd.size() != 6) {
-    ROS_ERROR("Could not convert to velocity command frame. Vector should have a size of 6");
+    ROS_ERROR("[ContactControl] Could not convert to velocity command frame. Vector should have a size of 6");
     return;
   }
   if (controlFrame.compare(velFrame) != 0) {
@@ -394,7 +405,7 @@ void ContactControl::toVelFrame(std::vector<double> &cmd, ros::Time time) {
       cmd[4] = angular.vector.y;
       cmd[5] = angular.vector.z;
     } else {
-      ROS_ERROR("Could not transform to velocity command frame. Wait for transform timed out.");
+      ROS_ERROR("[ContactControl] Could not transform to velocity command frame. Wait for transform timed out.");
     }
   }
 }
@@ -425,7 +436,7 @@ void ContactControl::toControlFrame(geometry_msgs::WrenchStamped &data) {
       data.wrench.torque.z = torque.vector.z;
       data.header.frame_id = controlFrame;
     } else {
-      ROS_ERROR("Could not transform to control frame. Wait for transform timed out.");
+      ROS_ERROR("[ContactControl] Could not transform to control frame. Wait for transform timed out.");
     }
   }
 }
@@ -484,7 +495,7 @@ double ContactControl::getTravel(Contact::Perspective perspective) {
     }
       break;
     default:
-      ROS_ERROR("Incorrect perspective in getTravel call.");
+      ROS_ERROR("[ContactControl] Incorrect perspective in getTravel call.");
       break;
   }
   return travel;
@@ -513,7 +524,7 @@ void ContactControl::getFT(Contact::Dimension dim, double &ft, ros::Time &time) 
       ft = ftData.wrench.torque.z;
       break;
     default:
-      ROS_ERROR("Incorrect dimension in getFT call.");
+      ROS_ERROR("[ContactControl] Incorrect dimension in getFT call.");
       break;
   }
 }
@@ -531,7 +542,7 @@ void ContactControl::getFT(Contact::Perspective perspective, double &ft, ros::Ti
                0.5);
       break;
     default:
-      ROS_ERROR("Incorrect perspective in getFT call.");
+      ROS_ERROR("[ContactControl] Incorrect perspective in getFT call.");
       break;
   }
 }

@@ -1,0 +1,4 @@
+<launch>
+    <node name="contact_control_service_caller" pkg="contact_control" type="contact_control_service_caller.py"
+          output="screen"/>
+</launch>

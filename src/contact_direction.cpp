@@ -36,7 +36,7 @@ void ContactDirection::initialize(Contact::Dimension dim, std::string vf, std::s
 
 void ContactDirection::adjustSpringConstant(double k) {
   if (fabs(k) <= 1e-3) {
-    ROS_ERROR("Spring constant must be non-zero");
+    ROS_ERROR("[ContactDirection] Spring constant must be non-zero");
   } else {
     springConstant = k;
   }
@@ -51,13 +51,13 @@ ContactDirection::setMovement(double vMax, double ftStall, double dMax, double f
   displacementMax = dMax;
   setStart(pose);
   if (fabs(velocityMax) <= 1e-3) {
-    ROS_ERROR("Max velocity must be non zero");
+    ROS_ERROR("[ContactDirection] Max velocity must be non zero");
     isReady = false;
   } else if (displacementMax <= 1e-3) {
-    ROS_ERROR("Displacement max must be greater than zero");
+    ROS_ERROR("[ContactDirection] Displacement max must be greater than zero");
     isReady = false;
   } else if (forceTorqueMax <= 1e-3 || stallForceTorque <= 1e-3) {
-    ROS_ERROR("Force Torque max and stall force torque must be greater than zero");
+    ROS_ERROR("[ContactDirection] Force Torque max and stall force torque must be greater than zero");
     isReady = false;
   } else {
     springConstant = stallForceTorque / fabs(velocityMax);
@@ -70,7 +70,7 @@ void ContactDirection::setSpring(double k, double b, double posOffset, double ft
   movementType = Contact::SPRING;
   setStart(pose);
   if (fabs(k) <= 1e-3 || fabs(b) <= 1e-3) {
-    ROS_ERROR("Spring and damping constants must be non zero");
+    ROS_ERROR("[ContactDirection] Spring and damping constants must be non zero");
     isReady = false;
   } else {
     springConstant = k;
@@ -84,7 +84,7 @@ void ContactDirection::setSpring(double k, double b, double posOffset, double ft
 void ContactDirection::setSpring(double k, double b, double posOffset, double dMax, double ftMax,
                                  geometry_msgs::PoseStamped pose) {
   if (dMax <= -1e-3) {
-    ROS_ERROR("Displacement max must be positive");
+    ROS_ERROR("[ContactDirection] Displacement max must be positive");
     isReady = false;
     return;
   } else {
@@ -97,9 +97,10 @@ void ContactDirection::setFollower(double b, double ftMax, geometry_msgs::PoseSt
   movementType = Contact::FOLLOWER;
   setStart(pose);
   if (fabs(b) <= 1e-3) {
-    ROS_ERROR("Damping constant must be non zero");
+    ROS_ERROR("[ContactDirection] Damping constant must be non zero");
     isReady = false;
   } else {
+    ROS_INFO("[ContactDirection] Setting follower for direction %i", direction);
     dampingCoeff = b;
     isReady = true;
   }
@@ -111,7 +112,6 @@ double ContactDirection::getVelocity(double ft, geometry_msgs::PoseStamped pose)
     writeFT(ft);
   }
   if (isReady) {
-    double velocity;
     if (Contact::SPRING == movementType) {
       //dampingCoeff - mida suurem, seda aeglasemalt liigub. Esialgu katsetada 1'ga, siis saab võrdustada springContanti max ft'ga
       //springConstant - mida suurem, seda
@@ -125,15 +125,33 @@ double ContactDirection::getVelocity(double ft, geometry_msgs::PoseStamped pose)
     } else if (Contact::FOLLOWER == movementType) {
       //getTravel(pose);
       //ROS_INFO_STREAM("FT for dim: " << direction << ". " << ft);
-      velocity = (1 / dampingCoeff) * ft;
+      if (std::abs(ft) > 2.5) {
+        velocity = (1 / dampingCoeff) * ft;
+      } else {//Slow down, if small enough force
+        //Otherwise decelrate
+        if (velocity > 0) {
+          velocity = velocity - deceleration;
+        } else {
+          velocity = velocity + deceleration;
+        }
+      }
+
     } else {
-      ROS_ERROR("Movement type is incorrect.");
+      ROS_ERROR("[ContactDirection] Movement type is incorrect.");
       velocity = 0.0;
     }
-    return velocity;
+
+    //If velocity already small enough, set it to 0
+    if (std::abs(velocity) <= std::abs(deceleration)) {
+      velocity = 0.0;
+    }
+
   } else {
-    return 0.0;
+    velocity = 0.0;
   }
+
+
+  return velocity;
 }
 
 void ContactDirection::reset() {
@@ -198,7 +216,7 @@ void ContactDirection::setStart(geometry_msgs::PoseStamped pose) {
     if (listener->waitForTransform(controlFrame, velFrame, pose.header.stamp, ros::Duration(1.0))) {
       listener->lookupTransform(controlFrame, velFrame, pose.header.stamp, startFrame);
     } else {
-      ROS_ERROR("Could not find transform from world to control frame. Wait for transform timed out.");
+      ROS_ERROR("[ContactDirection] Could not find transform from world to control frame. Wait for transform timed out.");
     }
   }
 
@@ -238,10 +256,10 @@ void ContactDirection::toStartFrame(tf::Stamped <tf::Pose> &pose) {
         listener->transformPose(velFrame, pose, pose);
       }
       catch (tf::TransformException ex) {
-        ROS_ERROR_STREAM("Could not transform pose to world frame. " << ex.what());
+        ROS_ERROR_STREAM("[ContactDirection] Could not transform pose to world frame. " << ex.what());
       }
     } else {
-      ROS_ERROR("Could not transform pose to world frame. Wait for transform timed out.");
+      ROS_ERROR("[ContactDirection] Could not transform pose to world frame. Wait for transform timed out.");
     }
   }
   // Next use the transform we found to convert to the starting frame.
@@ -265,11 +283,11 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
   switch (direction) {
     case Contact::DIM_X:
       travel = endPose.getOrigin().getX() - startPose.getOrigin().getX();
-      ROS_INFO_STREAM("Get travel for dim: x. Travel: " << travel);
+      ROS_INFO_STREAM("[ContactDirection] Get travel for dim: x. Travel: " << travel);
       break;
     case Contact::DIM_Y:
       travel = endPose.getOrigin().getY() - startPose.getOrigin().getY();
-      ROS_INFO_STREAM("Get travel for dim: y. Travel: " << travel);
+      ROS_INFO_STREAM("[ContactDirection] Get travel for dim: y. Travel: " << travel);
       break;
     case Contact::DIM_Z:
       travel = endPose.getOrigin().getZ() - startPose.getOrigin().getZ();
@@ -296,7 +314,7 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
     }
       break;
     default:
-      ROS_ERROR("Direction class initialized with incorrect direction variable");
+      ROS_ERROR("[ContactDirection] Direction class initialized with incorrect direction variable");
       break;
   }
   //ROS_INFO_STREAM("Get travel for all dims. " << diff.getOrigin().getX() << " " << diff.getOrigin().getY() << " " << diff.getOrigin().getZ());

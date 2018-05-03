@@ -7,11 +7,13 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11" )
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  cartesian_impedance_msgs
   moveit_core
   moveit_kinematics
   moveit_ros_planning_interface
   netft_utils
   roscpp
+  rospy
   std_msgs
   tf
 )
@@ -93,6 +95,11 @@ catkin_package(
   #DEPENDS Eigen3
 )
 
+
+catkin_install_python(PROGRAMS
+        scripts/contact_control_service_caller.py
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/src
+        )
 
 ###########
 ## Build ##
