@@ -60,7 +60,7 @@ ContactDirection::setMovement(double vMax, double ftStall, double dMax, double f
     ROS_ERROR("[ContactDirection] Force Torque max and stall force torque must be greater than zero");
     isReady = false;
   } else {
-    springConstant = stallForceTorque / fabs(velocityMax);
+    springConstant = stallForceTorque / fabs(velocityMax); //TODO: kahtlane koht
     isReady = true;
   }
 }
@@ -121,7 +121,20 @@ double ContactDirection::getVelocity(double ft, geometry_msgs::PoseStamped pose)
       //velocity = (1 / dampingCoeff * ft) - (springConstant * (getTravel(pose) /*+ positionOffset*/));
       velocity = (springConstant * -(getTravel(pose) + positionOffset) + (1 / dampingCoeff) * ft);
     } else if (Contact::DIRECTION == movementType) {
-      velocity = checkSpeed((velocityMax + (ft / (springConstant))), pose);
+
+      double remainingTravel = displacementMax - fabs(getTravel(pose));
+      ROS_INFO_THROTTLE(1,"[ContactDirection] remaining travel: %f", remainingTravel);
+
+      if ((remainingTravel <= 0.02 && fabs(velocity) >= 0.02) || ft >= stallForceTorque) {
+        if (velocity > 0) {
+          velocity = velocity - deceleration;
+        } else {
+          velocity = velocity + deceleration;
+        }
+      } else {
+        velocity = velocityMax;
+      }
+
     } else if (Contact::FOLLOWER == movementType) {
       //getTravel(pose);
       //ROS_INFO_STREAM("FT for dim: " << direction << ". " << ft);
@@ -271,23 +284,20 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
   double travel = 0.0;
   tf::Stamped <tf::Pose> endPose;
   tf::poseStampedMsgToTF(pose, endPose);
-  if (startPose.frame_id_.compare("start_frame") != 0) { //TODO compare with endpose or startposE?
+
+  if (startPose.frame_id_.compare("start_frame") != 0) {
     toStartFrame(endPose);
   }
-  //ROS_INFO_STREAM("Start pose: Frame: " << startPose.frame_id_ << ". X: " << startPose.getOrigin().getX() << " Y: " << startPose.getOrigin().getY() << " Z: " << startPose.getOrigin().getZ() <<
-  //              ". End pose: Frame: " << endPose.frame_id_ << " X: " << endPose.getOrigin().getX() << " Y: " << endPose.getOrigin().getY() << " Z: " << endPose.getOrigin().getZ());
-  //ROS_INFO_STREAM("Xminus: " << endPose.getOrigin().getX()-startPose.getOrigin().getX() << " Xdiff: " << diff.getOrigin().getX() <<
-  //               " Yminus: " << endPose.getOrigin().getY()-startPose.getOrigin().getY() << " Ydiff: " << diff.getOrigin().getY() <<
-  //               " Zminus: " << endPose.getOrigin().getZ()-startPose.getOrigin().getZ() << " Zdiff: " << diff.getOrigin().getZ());
+  //ROS_INFO_STREAM("Travel x: " << endPose.getOrigin().getX() - startPose.getOrigin().getX());
+  //ROS_INFO_STREAM("Travel y: " << endPose.getOrigin().getY() - startPose.getOrigin().getY());
+  //ROS_INFO_STREAM("Travel z: " << endPose.getOrigin().getZ() - startPose.getOrigin().getZ());
   ros::Time time = ros::Time::now();
   switch (direction) {
     case Contact::DIM_X:
       travel = endPose.getOrigin().getX() - startPose.getOrigin().getX();
-      ROS_INFO_STREAM("[ContactDirection] Get travel for dim: x. Travel: " << travel);
       break;
     case Contact::DIM_Y:
       travel = endPose.getOrigin().getY() - startPose.getOrigin().getY();
-      ROS_INFO_STREAM("[ContactDirection] Get travel for dim: y. Travel: " << travel);
       break;
     case Contact::DIM_Z:
       travel = endPose.getOrigin().getZ() - startPose.getOrigin().getZ();
@@ -322,18 +332,4 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
   //ROS_INFO_STREAM("Get travel for dim: 1. Travel: " << diff.getOrigin().getY());
   //ROS_INFO_STREAM("Get travel for dim: 2. Travel: " << diff.getOrigin().getZ());
   return travel;
-}
-
-double ContactDirection::checkSpeed(double velocity, geometry_msgs::PoseStamped pose) {
-  double remainingTravel = displacementMax - fabs(getTravel(pose));
-  int sign = 1;
-  if (velocity < 0)
-    sign = -1;
-  if (remainingTravel <= 0.02 && fabs(velocity) >= 0.3) {
-    return sign * 0.3;
-  } else if (remainingTravel <= 0.01 && fabs(velocity) >= 0.1) {
-    return sign * 0.1;
-  } else {
-    return velocity;
-  }
 }

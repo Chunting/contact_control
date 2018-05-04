@@ -15,3 +15,9 @@ contact_control:
   lp_filter_cutoff_freq: 0.6
   #mechanical properties
   flip_xy: true
+  x_direction: 1
+  y_direction: 1
+  #constraints
+  global_max_force: 15.0
+  global_max_torque: 15.0
+  max_velocity: 0.25 # 0.0 - 1.0

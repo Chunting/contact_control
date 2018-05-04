@@ -2,7 +2,9 @@
 
 void ContactControlNode::init() {
     ros::ServiceServer service = nh_.advertiseService("configure_cartesian_impedance",
-                                                      &ContactControlNode::configure_cartesian_impedance, this);
+                         &ContactControlNode::configure_cartesian_impedance, this);
+    ros::ServiceServer service_blocking = nh_.advertiseService("configure_cartesian_impedance_blocking",
+                         &ContactControlNode::configure_cartesian_impedance_blocking, this);
 
     //Contact control initial configuration
     std::string wrench_topic_param;
@@ -26,6 +28,10 @@ void ContactControlNode::init() {
                                 ft_sensor_frame_param, control_frame_param);
     ROS_INFO("[ContactControlNode] ContactControl initialized successfully!");
 
+    nh_.getParam("contact_control/global_max_force", global_max_force);
+    nh_.getParam("contact_control/global_max_torque", global_max_torque);
+    nh_.getParam("contact_control/max_velocity", max_velocity);
+
     while (ros::ok()) {
         ros::Duration(0.2).sleep();
         if (!pending_futures_.empty()) {
@@ -40,6 +46,31 @@ void ContactControlNode::init() {
 bool ContactControlNode::configure_cartesian_impedance(
         cartesian_impedance_msgs::ConfigureForceControl::Request &req,
         cartesian_impedance_msgs::ConfigureForceControl::Response &res) {
+    
+    set_move_parameters(req, res);
+
+    pending_futures_.push_back(contact_control_.moveAsync(global_max_force, global_max_torque, max_velocity));
+
+    ROS_INFO("[ContactControlNode] New move started");
+    return true;
+}
+
+bool ContactControlNode::configure_cartesian_impedance_blocking(
+        cartesian_impedance_msgs::ConfigureForceControl::Request &req,
+        cartesian_impedance_msgs::ConfigureForceControl::Response &res) {
+
+    set_move_parameters(req, res);
+
+    ROS_INFO("[ContactControlNode] starting new blocking move");
+    contact_control_.moveAsync(global_max_force, global_max_torque, max_velocity);
+
+    return true;
+}
+
+bool ContactControlNode::set_move_parameters(
+        cartesian_impedance_msgs::ConfigureForceControl::Request &req,
+        cartesian_impedance_msgs::ConfigureForceControl::Response &res) {
+
     contact_control_.stopMove();
     ROS_INFO("[ContactControlNode] Previous move stopped");
 
@@ -61,7 +92,8 @@ bool ContactControlNode::configure_cartesian_impedance(
         double max_ctrl_force_torque = std::min(max_ctrl_force, max_ctrl_torque);
         double max_cart_vel = get_cart_vel(req, dim); //TODO not used
 
-        contact_control_.setFollower(dim, damping, max_ctrl_force_torque);
+        //contact_control_.setFollower(dim, damping, max_ctrl_force_torque);
+        contact_control_.setMovement(dim, max_cart_vel, max_ctrl_force_torque, max_path_deviation, max_ctrl_force_torque);
         //contact_control_.setSpring(dim, stiffness, damping, max_path_deviation, max_ctrl_force_torque);
         ROS_INFO(
                 "[ContactControlNode] Set follower rule with dimension: %s, "
@@ -72,13 +104,7 @@ bool ContactControlNode::configure_cartesian_impedance(
                 max_ctrl_force_torque);
     }
 
-    double global_max_force = 30.0;
-    double global_max_torque = 30.0;
-    double max_velocity = 0.25; // 0.0 - 1.0
 
-    pending_futures_.push_back(contact_control_.moveAsync(global_max_force, global_max_torque, max_velocity));
-
-    ROS_INFO("[ContactControlNode] New move started");
     return true;
 }
 

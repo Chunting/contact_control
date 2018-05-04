@@ -272,15 +272,8 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       if (sendJog) {
         jogCmd.header.frame_id = velFrame;
         jogCmd.header.stamp = ros::Time::now();
-
-        if (flipXY) {
-          jogCmd.twist.linear.x = deltas[1] * xDirection;
-          jogCmd.twist.linear.y = deltas[0] * yDirection;
-        } else {
-          jogCmd.twist.linear.x = deltas[0] * xDirection;
-          jogCmd.twist.linear.y = deltas[1] * yDirection;
-        }
-
+        jogCmd.twist.linear.x = deltas[0] * xDirection;
+        jogCmd.twist.linear.y = deltas[1] * yDirection;
         jogCmd.twist.linear.z = deltas[2];
         jogCmd.twist.angular.x = deltas[3];
         jogCmd.twist.angular.y = deltas[4];
@@ -506,10 +499,18 @@ void ContactControl::getFT(Contact::Dimension dim, double &ft, ros::Time &time) 
   ft = 0.0;
   switch (dim) {
     case Contact::DIM_X:
-      ft = ftData.wrench.force.x;
+        if (flipXY) {
+            ft = ftData.wrench.force.y;
+        } else {
+            ft = ftData.wrench.force.x;
+        }
       break;
     case Contact::DIM_Y:
-      ft = ftData.wrench.force.y;
+        if (flipXY) {
+            ft = ftData.wrench.force.x;
+        } else {
+            ft = ftData.wrench.force.y;
+        }
       break;
     case Contact::DIM_Z:
       ft = ftData.wrench.force.z;

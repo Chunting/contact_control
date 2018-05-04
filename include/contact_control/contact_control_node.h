@@ -15,6 +15,14 @@ private:
         cartesian_impedance_msgs::ConfigureForceControl::Request &req,
         cartesian_impedance_msgs::ConfigureForceControl::Response &res);
 
+    bool configure_cartesian_impedance_blocking(
+            cartesian_impedance_msgs::ConfigureForceControl::Request &req,
+            cartesian_impedance_msgs::ConfigureForceControl::Response &res);
+
+    bool set_move_parameters(
+            cartesian_impedance_msgs::ConfigureForceControl::Request &req,
+            cartesian_impedance_msgs::ConfigureForceControl::Response &res);
+
     double get_stiffness(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
 
     double get_damping(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
@@ -27,6 +35,10 @@ private:
     double get_ctrl_torque(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
 
     double get_cart_vel(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
+
+    double global_max_force = 30.0;
+    double global_max_torque = 30.0;
+    double max_velocity = 0.25; // 0.0 - 1.0
 
 public:
     ContactControlNode(ros::NodeHandle nh) {
