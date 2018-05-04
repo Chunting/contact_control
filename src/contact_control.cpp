@@ -242,6 +242,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       if (dirCondition != Contact::NO_CONDITION) {
         ROS_INFO_STREAM("[ContactControl] Stopping move for direction " << i << " because of " << dirCondition);
         deltas[i] = 0.0;
+        endCondition = dirCondition;
       } else {
         deltas[i] = direction[i].getVelocity(ft, currentPose);
       }
@@ -257,32 +258,32 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       } else if (vMax == 1.0) {
         vMax = 0.99;
       }
-      bool sendJog = false;
 
       for (int i = 0; i < Contact::NUM_DIMS; i++) {
         if (deltas[i] > vMax)
           deltas[i] = vMax;
         else if (deltas[i] < -vMax)
           deltas[i] = -vMax;
-
-        sendJog = true;
       }
-      // Send deltas to controller
-      geometry_msgs::TwistStamped jogCmd;
-      if (sendJog) {
-        jogCmd.header.frame_id = velFrame;
-        jogCmd.header.stamp = ros::Time::now();
-        jogCmd.twist.linear.x = deltas[0] * xDirection;
-        jogCmd.twist.linear.y = deltas[1] * yDirection;
-        jogCmd.twist.linear.z = deltas[2];
-        jogCmd.twist.angular.x = deltas[3];
-        jogCmd.twist.angular.y = deltas[4];
-        jogCmd.twist.angular.z = deltas[5];
-        delta_pub.publish(jogCmd);
-      } //TODO stop the move
     } else {
       ROS_INFO_STREAM("[ContactControl] Met end condition. Stopping move.");
+      for (int i = 0; i < Contact::NUM_DIMS; i++) {
+          deltas[i] = 0.0;
+      }
     }
+
+    // Send deltas to controller
+    geometry_msgs::TwistStamped jogCmd;
+    jogCmd.header.frame_id = velFrame;
+    jogCmd.header.stamp = ros::Time::now();
+    jogCmd.twist.linear.x = deltas[0] * xDirection;
+    jogCmd.twist.linear.y = deltas[1] * yDirection;
+    jogCmd.twist.linear.z = deltas[2];
+    jogCmd.twist.angular.x = deltas[3];
+    jogCmd.twist.angular.y = deltas[4];
+    jogCmd.twist.angular.z = deltas[5];
+    delta_pub.publish(jogCmd);
+
     loopRate.sleep();
     // Publish data to be plotted
     //std_msgs::Float64 temp;
