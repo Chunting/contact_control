@@ -57,9 +57,13 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
     return;
   }
 
-  n.getParam("contact_control/flip_xy", flipXY);
-  n.getParam("contact_control/x_direction", xDirection);
-  n.getParam("contact_control/y_direction", yDirection);
+  n.getParam("contact_control/ft_x_direction", ft_x_direction);
+  n.getParam("contact_control/ft_y_direction", ft_y_direction);
+  n.getParam("contact_control/ft_z_direction", ft_z_direction);
+
+  n.getParam("contact_control/travel_x_direction", travel_x_direction);
+  n.getParam("contact_control/travel_y_direction", travel_y_direction);
+  n.getParam("contact_control/travel_z_direction", travel_z_direction);
 
   if (!fti->initialize(controlRate, ff, ftf)) {
     ROS_ERROR("Failed to initialize force torque interface");
@@ -90,12 +94,12 @@ void ContactControl::initialize(std::string mg, std::string ff, std::string vf, 
   netft_cancel_sub = n.subscribe("/netft/cancel", 1, &ContactControl::cancelCallback, this);
 
   // Initialize contact directions
-  direction[Contact::DIM_X].initialize(Contact::DIM_X, velFrame, controlFrame, listener);
-  direction[Contact::DIM_RX].initialize(Contact::DIM_RX, velFrame, controlFrame, listener);
-  direction[Contact::DIM_Y].initialize(Contact::DIM_Y, velFrame, controlFrame, listener);
-  direction[Contact::DIM_RY].initialize(Contact::DIM_RY, velFrame, controlFrame, listener);
-  direction[Contact::DIM_Z].initialize(Contact::DIM_Z, velFrame, controlFrame, listener);
-  direction[Contact::DIM_RZ].initialize(Contact::DIM_RZ, velFrame, controlFrame, listener);
+  direction[Contact::DIM_X].initialize(Contact::DIM_X, travel_x_direction, velFrame, controlFrame, listener);
+  direction[Contact::DIM_RX].initialize(Contact::DIM_RX, travel_x_direction, velFrame, controlFrame, listener);
+  direction[Contact::DIM_Y].initialize(Contact::DIM_Y, travel_y_direction, velFrame, controlFrame, listener);
+  direction[Contact::DIM_RY].initialize(Contact::DIM_RY, travel_y_direction, velFrame, controlFrame, listener);
+  direction[Contact::DIM_Z].initialize(Contact::DIM_Z, travel_z_direction, velFrame, controlFrame, listener);
+  direction[Contact::DIM_RZ].initialize(Contact::DIM_RZ, travel_z_direction, velFrame, controlFrame, listener);
 
   isInit = true;
 }
@@ -157,7 +161,7 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
   // Set loop rate
   ros::Rate loopRate(controlRate);
   // Start moving according to the control law
-  while (!netftCancel && Contact::NO_CONDITION == endCondition && ros::ok()) {
+  while (Contact::NO_CONDITION == endCondition) {
     // Publish a velocity command and check end conditions
     int startInfo = -1;
     for (int i = 0; i < Contact::NUM_DIMS; i++) {
@@ -174,7 +178,9 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       return Contact::NO_LAWS;
     }
     geometry_msgs::PoseStamped currentPose = mi->getCurrentPose();
-    direction[startInfo].toStartFrame(currentPose);
+
+    //direction[startInfo].toStartFrame(currentPose);
+
     ros::Time time;
     double ft;
     std::vector<double> torque;
@@ -248,6 +254,11 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
       }
     }
 
+    if (!ros::ok() || netftCancel) {
+      ROS_INFO("[ContactControl] NetFt cancel called or ROS has stopped working.");
+      endCondition = Contact::EXTERNAL;
+    }
+
     if (Contact::NO_CONDITION == endCondition) {
       // Convert deltas to world frame to send to controller
       toVelFrame(deltas, time);
@@ -276,8 +287,8 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
     geometry_msgs::TwistStamped jogCmd;
     jogCmd.header.frame_id = velFrame;
     jogCmd.header.stamp = ros::Time::now();
-    jogCmd.twist.linear.x = deltas[0] * xDirection;
-    jogCmd.twist.linear.y = deltas[1] * yDirection;
+    jogCmd.twist.linear.x = deltas[0];
+    jogCmd.twist.linear.y = deltas[1];
     jogCmd.twist.linear.z = deltas[2];
     jogCmd.twist.angular.x = deltas[3];
     jogCmd.twist.angular.y = deltas[4];
@@ -293,10 +304,10 @@ Contact::EndCondition ContactControl::move(double fMax, double tMax, double vMax
     //ROS_INFO_STREAM("Force or Torque: " << ft);
     ////ROS_INFO_STREAM("Velocity: " << (vMax - (ft/k)));
   }
+
   ROS_INFO("[ContactControl] Finished move.");
-  if (netftCancel) {
-    ROS_INFO("[ContactControl] NetFt cancel called.");
-  }
+
+
   for (int j = 0; j < Contact::NUM_DIMS; j++) {
     direction[j].reset();
   }
@@ -376,6 +387,7 @@ void ContactControl::toVelFrame(std::vector<double> &cmd, ros::Time time) {
     ROS_ERROR("[ContactControl] Could not convert to velocity command frame. Vector should have a size of 6");
     return;
   }
+
   if (controlFrame.compare(velFrame) != 0) {
     geometry_msgs::Vector3Stamped linear;
     geometry_msgs::Vector3Stamped angular;
@@ -500,21 +512,13 @@ void ContactControl::getFT(Contact::Dimension dim, double &ft, ros::Time &time) 
   ft = 0.0;
   switch (dim) {
     case Contact::DIM_X:
-        if (flipXY) {
-            ft = ftData.wrench.force.y;
-        } else {
-            ft = ftData.wrench.force.x;
-        }
+      ft = ftData.wrench.force.x * ft_x_direction;
       break;
     case Contact::DIM_Y:
-        if (flipXY) {
-            ft = ftData.wrench.force.x;
-        } else {
-            ft = ftData.wrench.force.y;
-        }
+      ft = ftData.wrench.force.y * ft_y_direction;
       break;
     case Contact::DIM_Z:
-      ft = ftData.wrench.force.z;
+      ft = ftData.wrench.force.z * ft_z_direction;
       break;
     case Contact::DIM_RX:
       ft = ftData.wrench.torque.x;

@@ -36,6 +36,8 @@ private:
 
     double get_cart_vel(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
 
+    int get_ctrl_law(cartesian_impedance_msgs::ConfigureForceControl::Request &req, Contact::Dimension dim);
+
     double global_max_force = 30.0;
     double global_max_torque = 30.0;
     double max_velocity = 0.25; // 0.0 - 1.0

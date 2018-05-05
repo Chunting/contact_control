@@ -91,19 +91,23 @@ bool ContactControlNode::set_move_parameters(
         double max_ctrl_torque = get_ctrl_torque(req, dim);
         double max_ctrl_force_torque = std::min(max_ctrl_force, max_ctrl_torque);
         double max_cart_vel = get_cart_vel(req, dim); //TODO not used
+        int ctrl_law = get_ctrl_law(req, dim);
 
-        //contact_control_.setFollower(dim, damping, max_ctrl_force_torque);
-        contact_control_.setMovement(dim, max_cart_vel, max_ctrl_force_torque, max_path_deviation, max_ctrl_force_torque);
-        //contact_control_.setSpring(dim, stiffness, damping, max_path_deviation, max_ctrl_force_torque);
-        ROS_INFO(
-                "[ContactControlNode] Set follower rule with dimension: %s, "
-                        "stiffness: %f, damping: %f, "
-                        "max deviation: %f, max_ctrl_force_torque: %f", s_to_d.first.c_str(), stiffness,
-                damping,
-                max_path_deviation,
-                max_ctrl_force_torque);
+        if (ctrl_law == cartesian_impedance_msgs::ControlLaw::TYPE_FOLLOWER) {
+            ROS_INFO("[ContactControlNode] Set FOLLOWER law for %s", s_to_d.first.c_str());
+            contact_control_.setFollower(dim, damping, max_ctrl_force_torque);
+        } else if (ctrl_law == cartesian_impedance_msgs::ControlLaw::TYPE_COMPLIANT_MOVE) {
+            ROS_INFO("[ContactControlNode] Set COMPLIANT_MOVE law for %s", s_to_d.first.c_str());
+            contact_control_.setMovement(dim, max_cart_vel, max_ctrl_force_torque, max_path_deviation,
+                                         max_ctrl_force_torque);
+        } else if (ctrl_law == cartesian_impedance_msgs::ControlLaw::TYPE_SPRING) {
+            ROS_INFO("[ContactControlNode] Set SPRING law for %s", s_to_d.first.c_str());
+            double position_offset = 0.0;
+            contact_control_.setSpring(dim, stiffness, damping, position_offset, max_ctrl_force_torque);
+        } else {
+            ROS_WARN("[ContactControlNode] No law set to dimesnion %s", s_to_d.first.c_str());
+        }
     }
-
 
     return true;
 }
@@ -229,6 +233,25 @@ double ContactControlNode::get_cart_vel(cartesian_impedance_msgs::ConfigureForce
     }
 }
 
+int ContactControlNode::get_ctrl_law(cartesian_impedance_msgs::ConfigureForceControl::Request &req,
+                                        Contact::Dimension dim) {
+    switch (dim) {
+        case Contact::Dimension::DIM_X:
+            return req.direction_control_laws.x.type;
+        case Contact::Dimension::DIM_Y:
+            return req.direction_control_laws.y.type;
+        case Contact::Dimension::DIM_Z:
+            return req.direction_control_laws.z.type;
+        case Contact::Dimension::DIM_RX:
+            return req.direction_control_laws.rx.type;
+        case Contact::Dimension::DIM_RY:
+            return req.direction_control_laws.ry.type;
+        case Contact::Dimension::DIM_RZ:
+            return req.direction_control_laws.rz.type;
+        default:
+            return 0;
+    }
+}
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "contact_control_node");

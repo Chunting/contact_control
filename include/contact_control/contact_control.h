@@ -273,9 +273,13 @@ private:
     double gravLever;                 /*!< Length from FT sensor to balance contact force in meters */
     bool monitorFT;                 /*!< True if we are monitoring the FT sensor */
     bool isInit;                    /*!< True if this instance has been initialized correctly */
-    bool flipXY;
-    int xDirection;
-    int yDirection;
+    int ft_x_direction;
+    int ft_y_direction;
+    int ft_z_direction;
+    int travel_x_direction;
+    int travel_y_direction;
+    int travel_z_direction;
+
     // ROS publishers
     ros::Publisher delta_pub;                        /*!< Publisher for commanded velocities */
     ros::Publisher data_pub;                         /*!< Convenience publisher for data to be plotted */

@@ -16,7 +16,8 @@ ContactDirection::ContactDirection() :
     travelMax(0.0),
     isReady(false),
     controlFrame(""),
-    velFrame("") {
+    velFrame(""),
+    dir_polarity(1) {
   // Do nothing
 }
 
@@ -24,7 +25,7 @@ ContactDirection::~ContactDirection() {
   // delete listener;
 }
 
-void ContactDirection::initialize(Contact::Dimension dim, std::string vf, std::string cf, tf::TransformListener *list) {
+void ContactDirection::initialize(Contact::Dimension dim, int dir_polarity, std::string vf, std::string cf, tf::TransformListener *list) {
   direction = dim;
   velFrame = vf;
   controlFrame = cf;
@@ -32,6 +33,7 @@ void ContactDirection::initialize(Contact::Dimension dim, std::string vf, std::s
   startFrame.frame_id_ = "start_frame";
   startFrame.setIdentity();
   isInitialized = true;
+  this->dir_polarity = dir_polarity;
 }
 
 void ContactDirection::adjustSpringConstant(double k) {
@@ -113,13 +115,16 @@ double ContactDirection::getVelocity(double ft, geometry_msgs::PoseStamped pose)
   }
   if (isReady) {
     if (Contact::SPRING == movementType) {
-      //dampingCoeff - mida suurem, seda aeglasemalt liigub. Esialgu katsetada 1'ga, siis saab võrdustada springContanti max ft'ga
-      //springConstant - mida suurem, seda
-      /*if (fabs(getTravel(pose)) >= displacementMax) {
-        //TODO jätta meelde, kuhu poole liikus (velocity märk) ning kui see muutub, siis lahti lasta...
-      }*/
-      //velocity = (1 / dampingCoeff * ft) - (springConstant * (getTravel(pose) /*+ positionOffset*/));
-      velocity = (springConstant * -(getTravel(pose) + positionOffset) + (1 / dampingCoeff) * ft);
+      double travel = getTravel(pose) * dir_polarity/*roundf(getTravel(pose) * 10) / 10;*/;
+      double force_torque = roundf(ft * 100) / 100;
+      //ROS_INFO("[ContactDirection] Travel: %f", travel);
+
+      double max_velocity = 0.2;
+
+      velocity = (springConstant * -(travel + positionOffset) + (1 / dampingCoeff) * force_torque);
+      velocity = (roundf(velocity * 100) / 100) * max_velocity;
+      //ROS_INFO_STREAM("Velocity " << velocity);
+
     } else if (Contact::DIRECTION == movementType) {
 
       double remainingTravel = displacementMax - fabs(getTravel(pose));
@@ -178,20 +183,27 @@ Contact::EndCondition ContactDirection::getCondition(double ft, geometry_msgs::P
 
   if (isReady) {
     if (fabs(ft) >= forceTorqueMax) {
+      ROS_INFO_STREAM(
+              "[ContactDirection] Ending movement with FT_VIOLATION for " << direction << " ft: " << fabs(ft) << " max:"
+                                                                          << forceTorqueMax);
       endCondition = Contact::FT_VIOLATION;
     }
     if (Contact::DIRECTION == movementType) {
       if (fabs(getTravel(pose)) >= displacementMax || checkDiff()) {
+        ROS_INFO_STREAM("[ContactDirection] Ending movement with MAX_TRAVEL for " << direction);
         endCondition = Contact::MAX_TRAVEL;
-      } else if (checkDiff())
+      } else if (checkDiff()) {
+        ROS_INFO_STREAM("[ContactDirection] Ending movement with DIFF_VIOLATION for " << direction);
         endCondition = Contact::DIFF_VIOLATION;
+      }
     } else if (Contact::SPRING == movementType && displacementMax >= 1e-3) {
       if (fabs(getTravel(pose)) >= displacementMax) {
+        ROS_INFO_STREAM("[ContactDirection] Ending movement with MAX_TRAVEL SPRING law for " << direction);
         endCondition = Contact::MAX_TRAVEL;
       }
     }
   }
-  //ROS_INFO_STREAM("Dimension: " << direction << " FT: " << ft << " Travel: " << fabs(getTravel(pose)) << " Max: " << displacementMax);
+
   return endCondition;
 }
 
@@ -239,6 +251,7 @@ void ContactDirection::setStart(geometry_msgs::PoseStamped pose) {
     toStartFrame(startPose);
   }
   travelMax = 0.0;
+  ROS_INFO_STREAM("[ContactDirection] set start for " << direction);
   hasStart = true;
 }
 
@@ -251,6 +264,7 @@ tf::StampedTransform ContactDirection::getStart() {
 }
 
 void ContactDirection::toStartFrame(geometry_msgs::PoseStamped &pose) {
+  ROS_INFO("tostart");
   // Convert the geometry msg to tf
   tf::Stamped <tf::Pose> tfPose;
   tf::poseStampedMsgToTF(pose, tfPose);
@@ -289,7 +303,8 @@ double ContactDirection::getTravel(geometry_msgs::PoseStamped pose) {
     toStartFrame(endPose);
   }
   //ROS_INFO_STREAM("Travel x: " << endPose.getOrigin().getX() - startPose.getOrigin().getX());
-  //ROS_INFO_STREAM("Travel y: " << endPose.getOrigin().getY() - startPose.getOrigin().getY());
+  //ROS_INFO_STREAM("Travel end: " << endPose.getOrigin().getY());
+  //ROS_INFO_STREAM("Travel start: " << startPose.getOrigin().getY());
   //ROS_INFO_STREAM("Travel z: " << endPose.getOrigin().getZ() - startPose.getOrigin().getZ());
   ros::Time time = ros::Time::now();
   switch (direction) {

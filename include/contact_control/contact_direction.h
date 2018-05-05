@@ -34,7 +34,7 @@ public:
      * @param cf   The name of the control frame.
      * @param list The pointer to the transform listener.
      */
-    void initialize(Contact::Dimension dir, std::string vf, std::string cf, tf::TransformListener *list);
+    void initialize(Contact::Dimension dir, int dir_polarity, std::string vf, std::string cf, tf::TransformListener *list);
 
     /**
      * Sets the spring constant for any type of move.
@@ -193,6 +193,7 @@ private:
     bool isReady;                    /*!< True if a control scheme has been picked and initialized */
     double velocity = 0.0;
     double deceleration = 0.005;
+    int dir_polarity;
     // Listener
     tf::TransformListener *listener;              /*!< Pointer to a transform listener */
 
